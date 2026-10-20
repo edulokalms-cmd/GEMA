@@ -1,0 +1,6 @@
+{
+  "name": "GEMA BIO - Gamifikasi E-Learning Mahasiswa",
+  "description": "Platform gamifikasi e-learning interaktif mahasiswa dengan materi terstruktur, mini kuis, sistem poin, level, dan badge pencapaian.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

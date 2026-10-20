@@ -1,0 +1,128 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User account in GEMA BIO learning management system",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "username": { "type": "string" },
+        "nim": { "type": "string" },
+        "nidn": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "dosen", "mahasiswa"] },
+        "status": { "type": "string" },
+        "class_name": { "type": "string" },
+        "department": { "type": "string" }
+      },
+      "required": ["id", "name", "role", "username"]
+    },
+    "Course": {
+      "title": "Course",
+      "description": "Academic course in LMS",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "name": { "type": "string" },
+        "semester": { "type": "string" },
+        "lecturer_id": { "type": "string" },
+        "lecturer_name": { "type": "string" },
+        "sks": { "type": "number" }
+      },
+      "required": ["id", "code", "name"]
+    },
+    "Material": {
+      "title": "Material",
+      "description": "Learning module and study materials",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "course_id": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "content": { "type": "string" },
+        "order_number": { "type": "number" }
+      },
+      "required": ["id", "title"]
+    },
+    "Quiz": {
+      "title": "Quiz",
+      "description": "Quiz assessment for learning materials",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "material_id": { "type": "string" },
+        "title": { "type": "string" },
+        "points": { "type": "number" }
+      },
+      "required": ["id", "material_id", "title"]
+    },
+    "Attendance": {
+      "title": "Attendance",
+      "description": "Student attendance record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "meeting_number": { "type": "number" },
+        "user_id": { "type": "string" },
+        "status": { "type": "string", "enum": ["hadir", "izin", "sakit", "alpa"] },
+        "date": { "type": "string" }
+      },
+      "required": ["id", "meeting_number", "user_id", "status"]
+    },
+    "Assignment": {
+      "title": "Assignment",
+      "description": "Student coursework assignment",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "meeting_number": { "type": "number" },
+        "title": { "type": "string" },
+        "max_score": { "type": "number" }
+      },
+      "required": ["id", "title"]
+    },
+    "AppState": {
+      "title": "AppState",
+      "description": "Complete persistent database snapshot for full sync and cold-restart persistence",
+      "type": "object",
+      "properties": {
+        "updated_at": { "type": "string" },
+        "version": { "type": "string" }
+      },
+      "required": ["updated_at"]
+    }
+  },
+  "firestore": {
+    "/system/app_state": {
+      "schema": "AppState",
+      "description": "Persistent primary system state and backup storage"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles and credentials"
+    },
+    "/courses/{courseId}": {
+      "schema": "Course",
+      "description": "Course information"
+    },
+    "/materials/{materialId}": {
+      "schema": "Material",
+      "description": "Learning materials"
+    },
+    "/quizzes/{quizId}": {
+      "schema": "Quiz",
+      "description": "Quizzes"
+    },
+    "/attendances/{attendanceId}": {
+      "schema": "Attendance",
+      "description": "Student attendance records"
+    },
+    "/assignments/{assignmentId}": {
+      "schema": "Assignment",
+      "description": "Course assignments"
+    }
+  }
+}
