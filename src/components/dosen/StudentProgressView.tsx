@@ -4,6 +4,7 @@ import { ProgressBar } from '../common/ProgressBar';
 import { LevelBadge } from '../common/LevelBadge';
 import { StudentDetailModal } from './StudentDetailModal';
 import { BadgeManagement } from './BadgeManagement';
+import { useCourse } from '../../context/CourseContext';
 import {
   Users,
   Search,
@@ -13,9 +14,12 @@ import {
   Zap,
   TrendingUp,
   X,
+  Layers,
+  CheckCircle2,
 } from 'lucide-react';
 
 export const StudentProgressView: React.FC = () => {
+  const { courses, activeCourseId, setActiveCourseId } = useCourse();
   const [overview, setOverview] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -39,11 +43,25 @@ export const StudentProgressView: React.FC = () => {
     loadData();
   }, []);
 
-  const availableClasses = Array.from(
-    new Set(overview.map((item) => item.user.class_name).filter(Boolean))
-  ).sort();
+  const activeCourse = courses.find((c) => c.id === activeCourseId);
+  const enrolledClassSet = activeCourse && Array.isArray(activeCourse.enrolled_classes) ? new Set(activeCourse.enrolled_classes) : null;
+  const enrolledStudentIdSet = activeCourse && Array.isArray(activeCourse.enrolled_student_ids) ? new Set(activeCourse.enrolled_student_ids) : null;
 
-  const filtered = overview.filter((item) => {
+  // Filter students: ONLY those enrolled in active course
+  const courseFilteredOverview = overview.filter((item) => {
+    if (!activeCourse || activeCourseId === 'all') return true;
+    const inClass = item.user.class_name && enrolledClassSet?.has(item.user.class_name);
+    const inStudent =
+      enrolledStudentIdSet?.has(item.user.id) ||
+      (item.user.student_id && enrolledStudentIdSet?.has(item.user.student_id));
+    return inClass || inStudent;
+  });
+
+  const availableClasses = activeCourse && Array.isArray(activeCourse.enrolled_classes) && activeCourse.enrolled_classes.length > 0
+    ? activeCourse.enrolled_classes
+    : Array.from(new Set(courseFilteredOverview.map((item) => item.user.class_name).filter(Boolean))).sort();
+
+  const filtered = courseFilteredOverview.filter((item) => {
     const matchesSearch =
       item.user.name.toLowerCase().includes(search.toLowerCase()) ||
       (item.user.student_id && item.user.student_id.toLowerCase().includes(search.toLowerCase())) ||
@@ -58,20 +76,71 @@ export const StudentProgressView: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-            Progres Belajar Seluruh Mahasiswa
+            Progres Belajar Mahasiswa
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Monitoring terperinci pencapaian materi, rata-rata skor kuis, dan akumulasi poin per mahasiswa.
+            Monitoring terperinci pencapaian materi, rata-rata skor kuis, dan akumulasi poin per mahasiswa sesuai mata kuliah aktif.
           </p>
         </div>
-        <button
-          onClick={() => setShowBadgeModal(true)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all shadow-xs cursor-pointer self-start sm:self-auto"
-        >
-          <Award className="w-4 h-4 text-[#EAA736]" />
-          <span>Master Badge Mahasiswa</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          {courses.length > 0 && (
+            <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200 shadow-2xs">
+              <Layers className="w-3.5 h-3.5 text-[#012E26]" />
+              <span className="text-xs font-bold text-slate-600">MK:</span>
+              <select
+                value={activeCourseId}
+                onChange={(e) => {
+                  setActiveCourseId(e.target.value);
+                  setSelectedClass('all');
+                }}
+                className="bg-transparent text-xs font-bold text-[#012E26] focus:outline-hidden cursor-pointer max-w-[170px] truncate"
+              >
+                <option value="all">Semua Mata Kuliah</option>
+                {courses.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.code} - {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          <button
+            onClick={() => setShowBadgeModal(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all shadow-xs cursor-pointer"
+          >
+            <Award className="w-4 h-4 text-[#EAA736]" />
+            <span>Master Badge Mahasiswa</span>
+          </button>
+        </div>
       </div>
+
+      {activeCourse && activeCourseId !== 'all' && (
+        <div className="bg-emerald-50/80 border border-emerald-200/90 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-emerald-950 shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
+              <CheckCircle2 className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="font-bold text-slate-900 text-sm">
+                Mata Kuliah Aktif: {activeCourse.name} ({activeCourse.code})
+              </p>
+              <p className="text-slate-500 text-xs mt-0.5">
+                Dosen: <strong>{activeCourse.lecturer_name}</strong> • Kelas Terploting:{' '}
+                <span className="font-bold text-emerald-800">
+                  {Array.isArray(activeCourse.enrolled_classes) && activeCourse.enrolled_classes.length > 0
+                    ? activeCourse.enrolled_classes.join(', ')
+                    : 'Semua'}
+                </span>
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 font-bold text-xs border border-emerald-200/60">
+              {courseFilteredOverview.length} Mahasiswa Terdaftar
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Search and Class Filter Bar */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-center gap-3">
@@ -94,9 +163,9 @@ export const StudentProgressView: React.FC = () => {
             onChange={(e) => setSelectedClass(e.target.value)}
             className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-indigo-950 focus:bg-white cursor-pointer w-full sm:w-auto"
           >
-            <option value="all">Semua Kelas ({overview.length})</option>
+            <option value="all">Semua Kelas ({courseFilteredOverview.length})</option>
             {availableClasses.map((cls) => {
-              const count = overview.filter((o) => o.user.class_name === cls).length;
+              const count = courseFilteredOverview.filter((o) => o.user.class_name === cls).length;
               return (
                 <option key={cls} value={cls}>
                   Kelas {cls} ({count} mhs)

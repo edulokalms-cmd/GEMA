@@ -412,19 +412,20 @@ export const CourseManagementView: React.FC<CourseManagementViewProps> = ({ onNa
                     <button
                       onClick={() => {
                         setActiveCourseId(course.id);
+                        setSelectedCourseForModal(course);
                         showToast({
-                          type: 'info',
-                          title: 'Mata Kuliah Aktif Dialihkan',
-                          message: `Ruang perkuliahan beralih ke "${course.name}".`,
+                          type: 'success',
+                          title: 'Mata Kuliah Aktif Dibuka',
+                          message: `Membuka daftar mahasiswa & kelompok untuk "${course.name}".`,
                         });
                       }}
                       className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
                         isActive
-                          ? 'bg-emerald-50 text-emerald-800 border border-emerald-200/80 hover:bg-emerald-100'
-                          : 'bg-slate-100 hover:bg-slate-200 text-slate-800'
+                          ? 'bg-emerald-100 text-emerald-900 border border-emerald-300 hover:bg-emerald-200'
+                          : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80'
                       }`}
                     >
-                      <span>{isActive ? 'Ruang Aktif Dipilih' : 'Pilih / Masuk Ruang MK'}</span>
+                      <span>{isActive ? 'Ruang Aktif (Buka Data)' : 'Pilih / Masuk Ruang MK'}</span>
                       <ArrowRight className="w-3.5 h-3.5" />
                     </button>
 
@@ -901,6 +902,8 @@ export const CourseManagementView: React.FC<CourseManagementViewProps> = ({ onNa
             </form>
           </div>
         </div>
+      )}
+
       {/* Modal Mahasiswa Terdaftar & Manajemen Kelompok Belajar */}
       <CourseStudentsAndGroupsModal
         course={selectedCourseForModal}

@@ -279,7 +279,7 @@ export const CourseStudentsAndGroupsModal: React.FC<CourseStudentsAndGroupsModal
 
     if (group.member_ids.includes(studentId)) {
       showToast({
-        type: 'warning',
+        type: 'info',
         title: 'Sudah Terdaftar',
         message: 'Mahasiswa sudah menjadi anggota kelompok ini.',
       });
@@ -771,7 +771,9 @@ export const CourseStudentsAndGroupsModal: React.FC<CourseStudentsAndGroupsModal
                                         <div className="font-bold text-slate-900 truncate flex items-center gap-1">
                                           <span>{m.name}</span>
                                           {isLeader && (
-                                            <Crown className="w-3 h-3 text-amber-600 shrink-0" title="Ketua Kelompok" />
+                                            <span title="Ketua Kelompok" className="inline-flex items-center">
+                                              <Crown className="w-3 h-3 text-amber-600 shrink-0" />
+                                            </span>
                                           )}
                                         </div>
                                         <div className="text-[10px] text-slate-400 flex items-center gap-2">

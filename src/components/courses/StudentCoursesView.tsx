@@ -3,11 +3,13 @@ import { useCourse } from '../../context/CourseContext';
 import { useAuth } from '../../context/AuthContext';
 import { useNotification } from '../../context/NotificationContext';
 import { api } from '../../services/api';
-import { CourseProgressSummary } from '../../types';
+import { Course, CourseProgressSummary } from '../../types';
+import { CourseStudentsAndGroupsModal } from './CourseStudentsAndGroupsModal';
 import {
   Layers,
   BookOpen,
   User,
+  Users,
   CheckCircle2,
   ArrowRight,
   HelpCircle,
@@ -33,6 +35,7 @@ export const StudentCoursesView: React.FC<StudentCoursesViewProps> = ({ onNaviga
   const [search, setSearch] = useState('');
   const [coursesProgress, setCoursesProgress] = useState<Record<string, CourseProgressSummary>>({});
   const [loadingProgress, setLoadingProgress] = useState(true);
+  const [selectedCourseForModal, setSelectedCourseForModal] = useState<Course | null>(null);
 
   useEffect(() => {
     api.progress
@@ -333,6 +336,17 @@ export const StudentCoursesView: React.FC<StudentCoursesViewProps> = ({ onNaviga
                     <ArrowRight className="w-4 h-4" />
                   </button>
 
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCourseForModal(course);
+                    }}
+                    className="w-full py-2 px-3 rounded-xl text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Users className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>Lihat Teman Sekelas & Kelompok MK</span>
+                  </button>
+
                   {/* Activity Shortcuts */}
                   <div className="grid grid-cols-3 gap-2 pt-1">
                     <button
@@ -372,6 +386,13 @@ export const StudentCoursesView: React.FC<StudentCoursesViewProps> = ({ onNaviga
           );
         })}
       </div>
+
+      {/* Modal Mahasiswa & Kelompok untuk Mahasiswa */}
+      <CourseStudentsAndGroupsModal
+        course={selectedCourseForModal}
+        isOpen={!!selectedCourseForModal}
+        onClose={() => setSelectedCourseForModal(null)}
+      />
     </div>
   );
 };
