@@ -19,6 +19,8 @@ import {
   FileText,
   FileSpreadsheet,
   Image as ImageIcon,
+  Video,
+  Play,
 } from 'lucide-react';
 
 interface MaterialDetailViewProps {
@@ -189,7 +191,7 @@ export const MaterialDetailView: React.FC<MaterialDetailViewProps> = ({
 
       {/* Main Material Content */}
       <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs max-w-none text-slate-800">
-        <RichContentRenderer content={material.content} />
+        <RichContentRenderer content={material.content} attachments={material.attachments} />
       </div>
 
       {/* Attachments Section */}
@@ -213,6 +215,8 @@ export const MaterialDetailView: React.FC<MaterialDetailViewProps> = ({
                   <div className="p-2.5 rounded-xl bg-white shadow-2xs border border-slate-200/60 shrink-0">
                     {att.type === 'image' ? (
                       <ImageIcon className="w-5 h-5 text-purple-600" />
+                    ) : att.type === 'video' ? (
+                      <Video className="w-5 h-5 text-rose-600" />
                     ) : att.type === 'spreadsheet' ? (
                       <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
                     ) : (

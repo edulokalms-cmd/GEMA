@@ -564,7 +564,7 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ onNaviga
         <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
           {isDosen
             ? 'Atur dan sesuaikan bobot komponen penilaian semester khusus akun Anda. Standar acuan resmi aplikasi tetap tersedia sebagai pembanding.'
-            : 'Atur logo resmi universitas, identitas institusi, dan komponen penilaian semester.'}
+            : 'Atur logo resmi universitas, jenjang pendidikan aktif, dan komponen penilaian semester.'}
         </p>
       </div>
 
@@ -794,67 +794,6 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ onNaviga
           </div>
         </div>
 
-        {/* Section 2: Academic Identity */}
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-4">
-          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-3">
-            <Building className="w-4 h-4 text-[#012E26]" />
-            <span>Identitas Institusi & Mata Kuliah</span>
-          </h3>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Nama Perguruan Tinggi
-              </label>
-              <input
-                type="text"
-                value={settings.campus_name}
-                onChange={(e) => setSettings({ ...settings, campus_name: e.target.value })}
-                className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 focus:bg-white font-medium"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Nama Mata Kuliah
-              </label>
-              <input
-                type="text"
-                value={settings.course_name}
-                onChange={(e) => setSettings({ ...settings, course_name: e.target.value })}
-                className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 focus:bg-white font-medium"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Semester Berjalan
-              </label>
-              <input
-                type="text"
-                value={settings.semester}
-                onChange={(e) => setSettings({ ...settings, semester: e.target.value })}
-                placeholder="Contoh: Ganjil 2026/2027"
-                className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 focus:bg-white"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Tahun Akademik
-              </label>
-              <input
-                type="text"
-                value={settings.academic_year}
-                onChange={(e) => setSettings({ ...settings, academic_year: e.target.value })}
-                placeholder="Contoh: 2026/2027"
-                className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 focus:bg-white"
-              />
-            </div>
-          </div>
-        </div>
 
         {/* Section: Manajemen Jenjang Pendidikan (Perguruan Tinggi) */}
         <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-5">

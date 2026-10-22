@@ -18,6 +18,8 @@ import {
   Eye,
   Layers,
   Sparkles,
+  Video,
+  Play,
 } from 'lucide-react';
 
 interface MaterialPreviewModalProps {
@@ -33,6 +35,8 @@ export const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
 }) => {
   const getAttachmentIcon = (type: string) => {
     switch (type) {
+      case 'video':
+        return <Video className="w-5 h-5 text-rose-600" />;
       case 'pdf':
         return <FileText className="w-5 h-5 text-rose-600" />;
       case 'presentation':
@@ -48,6 +52,8 @@ export const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
 
   const getAttachmentBadge = (type: string) => {
     switch (type) {
+      case 'video':
+        return 'bg-rose-50 text-rose-700 border-rose-200';
       case 'pdf':
         return 'bg-rose-50 text-rose-700 border-rose-200';
       case 'presentation':
@@ -166,7 +172,7 @@ export const MaterialPreviewModal: React.FC<MaterialPreviewModalProps> = ({
               <BookOpen className="w-4 h-4 text-[#012E26]" />
               Naskah & Modul Perkuliahan:
             </h3>
-            <RichContentRenderer content={material.content} />
+            <RichContentRenderer content={material.content} attachments={material.attachments} />
           </div>
 
           {/* Attachments Section */}

@@ -18,7 +18,7 @@ export interface User {
 export interface MaterialAttachment {
   id: string;
   name: string;
-  type: 'pdf' | 'doc' | 'presentation' | 'image' | 'spreadsheet' | 'link';
+  type: 'pdf' | 'doc' | 'presentation' | 'image' | 'spreadsheet' | 'link' | 'video';
   url: string;
   size?: string;
 }

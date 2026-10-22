@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { MaterialAttachment } from '../../types';
 import {
   FileText,
   FileSpreadsheet,
@@ -13,19 +14,91 @@ import {
   Lightbulb,
   AlertTriangle,
   Info,
+  Video,
+  Play,
 } from 'lucide-react';
 
 interface RichContentRendererProps {
   content: string;
+  attachments?: MaterialAttachment[];
   className?: string;
 }
 
 export const RichContentRenderer: React.FC<RichContentRendererProps> = ({
   content,
+  attachments = [],
   className = '',
 }) => {
   const [lightboxImage, setLightboxImage] = useState<{ url: string; alt: string } | null>(null);
   const [copiedCodeIndex, setCopiedCodeIndex] = useState<number | null>(null);
+
+  // Helper to resolve attachment:id or attachment:name into actual URL from attachments list
+  const resolveUrl = (rawUrl?: string): string => {
+    if (!rawUrl) return '';
+    const trimmed = rawUrl.trim();
+    if (trimmed.startsWith('attachment:')) {
+      const key = trimmed.replace(/^attachment:\s*/, '').trim();
+      const found = attachments.find((a) => a.id === key || a.name === key);
+      return found?.url || trimmed;
+    }
+    if (trimmed.startsWith('#attachment-')) {
+      const key = trimmed.replace(/^#attachment-/, '').trim();
+      const found = attachments.find((a) => a.id === key || a.name === key);
+      return found?.url || trimmed;
+    }
+    return trimmed;
+  };
+
+  const getEmbedVideoInfo = (rawUrl: string) => {
+    const url = resolveUrl(rawUrl).trim();
+    if (!url) return null;
+
+    // YouTube watch?v= or youtu.be/ or embed/ or shorts/
+    const ytMatch = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    if (ytMatch) {
+      return {
+        type: 'youtube' as const,
+        embedUrl: `https://www.youtube.com/embed/${ytMatch[1]}?rel=0&modestbranding=1`,
+        originalUrl: url,
+      };
+    }
+
+    // Vimeo
+    const vimeoMatch = url.match(/vimeo\.com\/(?:video\/)?([0-9]+)/);
+    if (vimeoMatch) {
+      return {
+        type: 'vimeo' as const,
+        embedUrl: `https://player.vimeo.com/video/${vimeoMatch[1]}`,
+        originalUrl: url,
+      };
+    }
+
+    // Google Drive
+    const driveMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+    if (driveMatch) {
+      return {
+        type: 'drive' as const,
+        embedUrl: `https://drive.google.com/file/d/${driveMatch[1]}/preview`,
+        originalUrl: url,
+      };
+    }
+
+    // Direct MP4 / WebM / OGG or data:video
+    if (
+      url.endsWith('.mp4') ||
+      url.endsWith('.webm') ||
+      url.endsWith('.ogg') ||
+      url.startsWith('data:video/')
+    ) {
+      return {
+        type: 'direct' as const,
+        embedUrl: url,
+        originalUrl: url,
+      };
+    }
+
+    return null;
+  };
 
   if (!content || !content.trim()) {
     return (
@@ -38,7 +111,7 @@ export const RichContentRenderer: React.FC<RichContentRendererProps> = ({
   // Parse lines into blocks
   const lines = content.split('\n');
   const blocks: Array<{
-    type: 'heading' | 'image' | 'file' | 'quote' | 'code' | 'list' | 'table' | 'divider' | 'paragraph';
+    type: 'heading' | 'image' | 'video' | 'file' | 'quote' | 'code' | 'list' | 'table' | 'divider' | 'paragraph';
     level?: number;
     text?: string;
     items?: string[];
@@ -86,6 +159,43 @@ export const RichContentRenderer: React.FC<RichContentRendererProps> = ({
       continue;
     }
 
+    // Check for Standalone Video: 🎥 [Title](url) or [video: Title](url) or [Video: Title](url)
+    const videoCardMatch = line.match(/^(?:🎥\s*)?\[(?:Video|Tonton Video|Video Materi):\s*([^\]]+)\]\(([^)]+)\)$/i);
+    if (videoCardMatch) {
+      blocks.push({
+        type: 'video',
+        alt: videoCardMatch[1].trim(),
+        url: videoCardMatch[2].trim(),
+      });
+      i++;
+      continue;
+    }
+
+    const customVideoMatch = line.match(/^\[video:\s*([^|\]]+)(?:\|\s*([^\]]+))?\](?:\(([^)]+)\))?$/i);
+    if (customVideoMatch) {
+      blocks.push({
+        type: 'video',
+        alt: customVideoMatch[1].trim(),
+        url: (customVideoMatch[3] || customVideoMatch[2] || customVideoMatch[1]).trim(),
+      });
+      i++;
+      continue;
+    }
+
+    // Direct standalone YouTube / Vimeo / Google Drive / MP4 URL on its own line
+    if (line.startsWith('http://') || line.startsWith('https://')) {
+      const vidInfo = getEmbedVideoInfo(line);
+      if (vidInfo) {
+        blocks.push({
+          type: 'video',
+          alt: 'Video Pembelajaran',
+          url: line,
+        });
+        i++;
+        continue;
+      }
+    }
+
     // Check for Standalone Image: ![Alt text](url) or [image: url | alt]
     const imgMatch = line.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
     if (imgMatch) {
@@ -110,7 +220,7 @@ export const RichContentRenderer: React.FC<RichContentRendererProps> = ({
     }
 
     // Check for Standalone File Link: 📎 [Title](url) or [file: filename | size](url)
-    const fileCardMatch = line.match(/^(?:📎\s*)?\[(?:Unduh Dokumen|File|Dokumen):\s*([^\]]+)\]\(([^)]+)\)$/i);
+    const fileCardMatch = line.match(/^(?:📎\s*)?\[(?:Unduh Dokumen|File|Dokumen|Unduh Berkas|Berkas):\s*([^\]]+)\]\(([^)]+)\)$/i);
     if (fileCardMatch) {
       blocks.push({
         type: 'file',
@@ -451,7 +561,13 @@ export const RichContentRenderer: React.FC<RichContentRendererProps> = ({
           }
 
           case 'image': {
-            const isDataUrl = block.url?.startsWith('data:image/');
+            const resolvedUrl = resolveUrl(block.url);
+            const matchingAtt = attachments.find(
+              (a) => a.url === resolvedUrl || (block.url && (a.id === block.url.replace(/^attachment:\s*/, '') || a.name === block.url.replace(/^attachment:\s*/, '')))
+            );
+            const isDataUrl = resolvedUrl?.startsWith('data:image/');
+            const imageName = block.alt || matchingAtt?.name || 'Gambar Materi';
+
             return (
               <figure
                 key={index}
@@ -459,8 +575,8 @@ export const RichContentRenderer: React.FC<RichContentRendererProps> = ({
               >
                 <div className="relative rounded-xl overflow-hidden bg-slate-900/5 max-h-[460px] flex items-center justify-center">
                   <img
-                    src={block.url}
-                    alt={block.alt || 'Gambar Materi'}
+                    src={resolvedUrl}
+                    alt={imageName}
                     className="max-h-[440px] w-auto max-w-full object-contain mx-auto rounded-lg transition-transform group-hover:scale-[1.01]"
                     loading="lazy"
                   />
@@ -468,7 +584,7 @@ export const RichContentRenderer: React.FC<RichContentRendererProps> = ({
                   <div className="absolute top-2 right-2 flex items-center gap-1.5 opacity-90 sm:opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       type="button"
-                      onClick={() => setLightboxImage({ url: block.url!, alt: block.alt || 'Gambar Materi' })}
+                      onClick={() => setLightboxImage({ url: resolvedUrl, alt: imageName })}
                       className="px-2.5 py-1.5 bg-slate-900/80 hover:bg-slate-900 text-white rounded-lg text-xs font-semibold backdrop-blur-xs flex items-center gap-1.5 shadow-md cursor-pointer transition-colors"
                       title="Perbesar Tampilan Gambar"
                     >
@@ -477,7 +593,7 @@ export const RichContentRenderer: React.FC<RichContentRendererProps> = ({
                     </button>
                     {!isDataUrl && (
                       <a
-                        href={block.url}
+                        href={resolvedUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="p-1.5 bg-white/90 hover:bg-white text-slate-700 rounded-lg backdrop-blur-xs shadow-md cursor-pointer transition-colors"
@@ -488,18 +604,100 @@ export const RichContentRenderer: React.FC<RichContentRendererProps> = ({
                     )}
                   </div>
                 </div>
-                {block.alt && (
+                {imageName && (
                   <figcaption className="mt-2 text-center text-xs font-medium text-slate-600 px-2 flex items-center justify-center gap-1.5">
                     <ImageIcon className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                    <span>{block.alt}</span>
+                    <span>{imageName}</span>
                   </figcaption>
                 )}
               </figure>
             );
           }
 
+          case 'video': {
+            const resolvedUrl = resolveUrl(block.url);
+            const videoInfo = getEmbedVideoInfo(resolvedUrl);
+            const matchingAtt = attachments.find(
+              (a) => a.url === resolvedUrl || (block.url && (a.id === block.url.replace(/^attachment:\s*/, '') || a.name === block.url.replace(/^attachment:\s*/, '')))
+            );
+            const videoTitle = block.alt || matchingAtt?.name || 'Tayangan Video Pembelajaran';
+
+            return (
+              <div
+                key={index}
+                className="my-5 rounded-3xl overflow-hidden border border-slate-200/90 bg-slate-900 shadow-md transition-all hover:border-indigo-400"
+              >
+                {/* Video Header Strip */}
+                <div className="px-4 py-2.5 bg-slate-800/90 border-b border-slate-700/80 flex items-center justify-between text-white text-xs">
+                  <div className="flex items-center gap-2 truncate">
+                    <div className="w-6 h-6 rounded-lg bg-rose-600 text-white flex items-center justify-center shrink-0">
+                      <Play className="w-3.5 h-3.5 fill-current" />
+                    </div>
+                    <span className="font-bold truncate">{videoTitle}</span>
+                  </div>
+                  {videoInfo?.originalUrl && !videoInfo.originalUrl.startsWith('data:') && (
+                    <a
+                      href={videoInfo.originalUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[11px] text-slate-300 hover:text-white bg-slate-700/70 hover:bg-slate-700 px-2 py-1 rounded-lg transition-colors cursor-pointer shrink-0 ml-2"
+                      title="Buka sumber video di tab baru"
+                    >
+                      <span>Buka Tautan</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+
+                {/* Video Content / Player */}
+                <div className="bg-black flex items-center justify-center">
+                  {videoInfo?.type === 'direct' ? (
+                    <video
+                      src={videoInfo.embedUrl}
+                      controls
+                      playsInline
+                      className="w-full max-h-[520px] aspect-video object-contain"
+                    >
+                      Browser Anda tidak mendukung pemutar video HTML5.
+                    </video>
+                  ) : videoInfo?.embedUrl ? (
+                    <div className="relative w-full aspect-video">
+                      <iframe
+                        src={videoInfo.embedUrl}
+                        title={videoTitle}
+                        className="absolute inset-0 w-full h-full border-0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowFullScreen
+                      />
+                    </div>
+                  ) : (
+                    <div className="p-8 text-center text-slate-400 text-xs">
+                      <p>Format video ini tidak dapat diputar langsung.</p>
+                      {resolvedUrl && (
+                        <a
+                          href={resolvedUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-block mt-2 px-3 py-1.5 rounded-xl bg-indigo-600 text-white font-bold"
+                        >
+                          Buka / Unduh Video
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          }
+
           case 'file': {
-            const fileName = block.alt || 'Dokumen Materi Perkuliahan';
+            const resolvedUrl = resolveUrl(block.url);
+            const matchingAtt = attachments.find(
+              (a) => a.url === resolvedUrl || (block.url && (a.id === block.url.replace(/^attachment:\s*/, '') || a.name === block.url.replace(/^attachment:\s*/, '')))
+            );
+            const fileName = block.alt || matchingAtt?.name || 'Dokumen Materi Perkuliahan';
+            const displaySize = matchingAtt?.size || block.size || 'Dokumen Perkuliahan';
+
             return (
               <div
                 key={index}
@@ -507,7 +705,7 @@ export const RichContentRenderer: React.FC<RichContentRendererProps> = ({
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="p-2.5 rounded-xl bg-white shadow-2xs border border-indigo-100 shrink-0">
-                    {getFileIcon(fileName, block.url || '')}
+                    {getFileIcon(fileName, resolvedUrl || '')}
                   </div>
                   <div className="min-w-0">
                     <p className="text-xs sm:text-sm font-bold text-slate-900 truncate">
@@ -516,7 +714,7 @@ export const RichContentRenderer: React.FC<RichContentRendererProps> = ({
                     <div className="flex items-center gap-2 text-[10px] text-slate-500 mt-0.5">
                       <span className="font-bold text-indigo-600 uppercase">Berkas Perkuliahan</span>
                       <span>•</span>
-                      <span>{block.size || 'Dapat Diunduh / Dibuka'}</span>
+                      <span>{displaySize}</span>
                     </div>
                   </div>
                 </div>
@@ -524,15 +722,15 @@ export const RichContentRenderer: React.FC<RichContentRendererProps> = ({
                 <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
                   <button
                     type="button"
-                    onClick={() => handleDownload(block.url || '', fileName)}
-                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                    onClick={() => handleDownload(resolvedUrl || '', fileName)}
+                    className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5" />
                     <span>Unduh File</span>
                   </button>
-                  {!block.url?.startsWith('data:') && (
+                  {!resolvedUrl?.startsWith('data:') && !resolvedUrl?.startsWith('blob:') && (
                     <a
-                      href={block.url}
+                      href={resolvedUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="p-1.5 bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-xl transition-colors cursor-pointer"

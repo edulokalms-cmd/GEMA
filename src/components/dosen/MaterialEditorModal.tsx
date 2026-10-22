@@ -32,6 +32,10 @@ import {
   Check,
   CheckCircle2,
   HelpCircle,
+  Video,
+  Play,
+  Youtube,
+  Wand2,
 } from 'lucide-react';
 
 interface MaterialEditorModalProps {
@@ -89,9 +93,19 @@ export const MaterialEditorModal: React.FC<MaterialEditorModalProps> = ({
   const [imageUploadedDataUrl, setImageUploadedDataUrl] = useState('');
   const [selectedPreset, setSelectedPreset] = useState<PresetDiagram | null>(null);
 
+  // Video insertion state
+  const [showVideoModal, setShowVideoModal] = useState(false);
+  const [videoModalTab, setVideoModalTab] = useState<'url' | 'upload'>('url');
+  const [videoUrlInput, setVideoUrlInput] = useState('');
+  const [videoTitleInput, setVideoTitleInput] = useState('');
+  const [videoUploadedDataUrl, setVideoUploadedDataUrl] = useState('');
+  const [videoUploadedFileName, setVideoUploadedFileName] = useState('');
+  const [videoUploadedSize, setVideoUploadedSize] = useState('');
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageUploadInputRef = useRef<HTMLInputElement>(null);
+  const videoUploadInputRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
 
   const handleAddObjective = () => {
@@ -131,6 +145,79 @@ export const MaterialEditorModal: React.FC<MaterialEditorModalProps> = ({
     }, 0);
   };
 
+  // Function to clean up bloated base64 data URLs in content text
+  const cleanUpBloatedDataUrls = () => {
+    let newContent = content;
+    let cleanedCount = 0;
+    const newAttachments = [...attachments];
+
+    // 1. Regex for markdown images with data: URL
+    // ![alt](data:...)
+    const imgDataRegex = /!\[(.*?)\]\((data:[^)]+)\)/g;
+    newContent = newContent.replace(imgDataRegex, (match, alt, dataUrl) => {
+      cleanedCount++;
+      let existing = newAttachments.find((a) => a.url === dataUrl);
+      if (!existing) {
+        const id = 'att_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+        existing = {
+          id,
+          name: alt || 'Gambar Materi',
+          type: 'image',
+          url: dataUrl,
+          size: 'Gambar Konten',
+        };
+        newAttachments.push(existing);
+      }
+      return `![${alt || existing.name}](attachment:${existing.id})`;
+    });
+
+    // 2. Regex for markdown links with data: URL
+    // [title](data:...) or 📎 [title](data:...)
+    const linkDataRegex = /(?:📎\s*)?\[(.*?)\]\((data:[^)]+)\)/g;
+    newContent = newContent.replace(linkDataRegex, (match, title, dataUrl) => {
+      cleanedCount++;
+      const cleanTitle = title.replace(/^(?:Unduh Dokumen|File|Dokumen|Unduh Berkas|Berkas|Video):\s*/i, '').trim();
+      let fileType: MaterialAttachment['type'] = 'doc';
+      if (dataUrl.startsWith('data:application/pdf')) fileType = 'pdf';
+      else if (dataUrl.startsWith('data:image/')) fileType = 'image';
+      else if (dataUrl.startsWith('data:video/')) fileType = 'video';
+
+      let existing = newAttachments.find((a) => a.url === dataUrl);
+      if (!existing) {
+        const id = 'att_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+        existing = {
+          id,
+          name: cleanTitle || 'Dokumen Materi',
+          type: fileType,
+          url: dataUrl,
+          size: 'Dokumen Perkuliahan',
+        };
+        newAttachments.push(existing);
+      }
+
+      if (fileType === 'video') {
+        return `🎥 [Video: ${cleanTitle || existing.name}](attachment:${existing.id})`;
+      }
+      return `📎 [Dokumen: ${cleanTitle || existing.name}](attachment:${existing.id})`;
+    });
+
+    if (cleanedCount > 0) {
+      setContent(newContent);
+      setAttachments(newAttachments);
+      showToast({
+        type: 'success',
+        title: 'Teks Naskah Berhasil Dirapikan!',
+        message: `${cleanedCount} data berkas/gambar base64 panjang telah diringkas menjadi nama dokumen rapi. File tetap aman tersimpan di lampiran.`,
+      });
+    } else {
+      showToast({
+        type: 'info',
+        title: 'Teks Sudah Bersih & Rapi',
+        message: 'Tidak ditemukan deretan data berkas base64 panjang di dalam teks.',
+      });
+    }
+  };
+
   // Paste listener for images (e.g. screenshot pasted directly)
   const handleTextareaPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const items = e.clipboardData?.items;
@@ -146,12 +233,11 @@ export const MaterialEditorModal: React.FC<MaterialEditorModalProps> = ({
           reader.onload = (loadEvt) => {
             const dataUrl = (loadEvt.target?.result as string) || '';
             const caption = 'Tangkapan Layar Gambar Materi ' + new Date().toLocaleTimeString();
-            const tag = `\n\n![${caption}](${dataUrl})\n\n`;
-            insertAtCursor(tag);
+            const newAttId = 'att_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
 
             // Also add to attachments list
             const newAtt: MaterialAttachment = {
-              id: 'att_' + Date.now(),
+              id: newAttId,
               name: caption + '.png',
               type: 'image',
               url: dataUrl,
@@ -159,10 +245,14 @@ export const MaterialEditorModal: React.FC<MaterialEditorModalProps> = ({
             };
             setAttachments((prev) => [...prev, newAtt]);
 
+            // Insert clean tag using attachment ID so textarea is not bloated
+            const tag = `\n\n![${caption}](attachment:${newAttId})\n\n`;
+            insertAtCursor(tag);
+
             showToast({
               type: 'success',
               title: 'Gambar Berhasil Ditempel!',
-              message: 'Tangkapan layar disisipkan ke naskah dan lampiran materi.',
+              message: 'Tangkapan layar disisipkan ke naskah dan lampiran secara ringkas.',
             });
           };
           reader.readAsDataURL(file);
@@ -212,24 +302,23 @@ export const MaterialEditorModal: React.FC<MaterialEditorModalProps> = ({
       finalCaption = imageCaptionInput.trim() || selectedPreset.caption;
     }
 
-    // Insert markdown tag at cursor
-    const tag = `\n\n![${finalCaption}](${finalUrl})\n\n`;
-    insertAtCursor(tag);
+    // Auto-add to attachments
+    const attId = 'att_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+    setAttachments((prev) => [
+      ...prev,
+      {
+        id: attId,
+        name: finalCaption,
+        type: 'image',
+        url: finalUrl,
+        size: 'Gambar Konten',
+      },
+    ]);
 
-    // Also auto-add to attachments if not already present
-    const exists = attachments.some((a) => a.url === finalUrl);
-    if (!exists) {
-      setAttachments((prev) => [
-        ...prev,
-        {
-          id: 'att_' + Date.now(),
-          name: finalCaption,
-          type: 'image',
-          url: finalUrl,
-          size: 'Gambar Konten',
-        },
-      ]);
-    }
+    // Insert clean tag at cursor
+    const cleanTagUrl = finalUrl.startsWith('data:') ? `attachment:${attId}` : finalUrl;
+    const tag = `\n\n![${finalCaption}](${cleanTagUrl})\n\n`;
+    insertAtCursor(tag);
 
     setShowImageModal(false);
     setImageUploadedDataUrl('');
@@ -240,7 +329,80 @@ export const MaterialEditorModal: React.FC<MaterialEditorModalProps> = ({
     showToast({
       type: 'success',
       title: 'Gambar Berhasil Disisipkan',
-      message: `"${finalCaption}" telah dicantumkan ke dalam naskah materi.`,
+      message: `"${finalCaption}" telah dicantumkan ke dalam naskah materi secara ringkas.`,
+    });
+  };
+
+  // Insert Video from modal
+  const handleConfirmInsertVideo = () => {
+    let finalUrl = '';
+    let finalTitle = videoTitleInput.trim();
+
+    if (videoModalTab === 'url') {
+      if (!videoUrlInput.trim()) {
+        showToast({
+          type: 'error',
+          title: 'URL Video Belum Diisi',
+          message: 'Masukkan tautan video YouTube, Google Drive, Vimeo, atau MP4.',
+        });
+        return;
+      }
+      finalUrl = videoUrlInput.trim();
+      if (!finalTitle) finalTitle = 'Video Pembelajaran';
+
+      const attId = 'att_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+      setAttachments((prev) => [
+        ...prev,
+        {
+          id: attId,
+          name: finalTitle,
+          type: 'video',
+          url: finalUrl,
+          size: 'Tautan Video Daring',
+        },
+      ]);
+
+      // Direct embeddable link in markdown
+      insertAtCursor(`\n\n🎥 [Video: ${finalTitle}](${finalUrl})\n\n`);
+    } else {
+      // Upload
+      if (!videoUploadedDataUrl) {
+        showToast({
+          type: 'error',
+          title: 'Berkas Belum Dipilih',
+          message: 'Silakan pilih berkas video MP4 atau WebM dari perangkat Anda.',
+        });
+        return;
+      }
+      if (!finalTitle) finalTitle = videoUploadedFileName || 'Video Rekaman Materi';
+
+      const attId = 'att_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+      setAttachments((prev) => [
+        ...prev,
+        {
+          id: attId,
+          name: finalTitle,
+          type: 'video',
+          url: videoUploadedDataUrl,
+          size: videoUploadedSize || 'Berkas Video',
+        },
+      ]);
+
+      // Use clean attachment reference so textarea is not clogged with millions of base64 characters
+      insertAtCursor(`\n\n🎥 [Video: ${finalTitle}](attachment:${attId})\n\n`);
+    }
+
+    setShowVideoModal(false);
+    setVideoUrlInput('');
+    setVideoTitleInput('');
+    setVideoUploadedDataUrl('');
+    setVideoUploadedFileName('');
+    setVideoUploadedSize('');
+
+    showToast({
+      type: 'success',
+      title: 'Video Berhasil Disisipkan!',
+      message: `Video "${finalTitle}" dapat diputar langsung di halaman naskah materi.`,
     });
   };
 
@@ -256,6 +418,7 @@ export const MaterialEditorModal: React.FC<MaterialEditorModalProps> = ({
       else if (['ppt', 'pptx', 'key'].includes(ext)) fileType = 'presentation';
       else if (['xls', 'xlsx', 'csv'].includes(ext)) fileType = 'spreadsheet';
       else if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'].includes(ext)) fileType = 'image';
+      else if (['mp4', 'webm', 'ogg', 'mov', 'mkv'].includes(ext)) fileType = 'video';
 
       const formatSize = (bytes: number) => {
         if (bytes < 1024) return bytes + ' B';
@@ -275,17 +438,19 @@ export const MaterialEditorModal: React.FC<MaterialEditorModalProps> = ({
         };
         setAttachments((prev) => [...prev, newAtt]);
 
-        // If it's an image, also insert directly into markdown
+        // Clean reference using attachment ID so textarea is not bloated with 300,000 characters of base64
         if (fileType === 'image') {
-          insertAtCursor(`\n\n![${file.name}](${dataUrl})\n\n`);
+          insertAtCursor(`\n\n![${file.name}](attachment:${newAtt.id})\n\n`);
+        } else if (fileType === 'video') {
+          insertAtCursor(`\n\n🎥 [Video: ${file.name}](attachment:${newAtt.id})\n\n`);
         } else {
-          insertAtCursor(`\n\n📎 [Unduh Dokumen: ${file.name}](${dataUrl})\n\n`);
+          insertAtCursor(`\n\n📎 [Dokumen: ${file.name}](attachment:${newAtt.id})\n\n`);
         }
 
         showToast({
           type: 'success',
           title: 'Berkas Berhasil Disisipkan!',
-          message: `"${file.name}" otomatis ditambahkan ke lampiran & naskah materi.`,
+          message: `"${file.name}" otomatis ditambahkan ke lampiran & naskah materi secara ringkas dan rapi.`,
         });
       };
       reader.readAsDataURL(file);
@@ -297,11 +462,11 @@ export const MaterialEditorModal: React.FC<MaterialEditorModalProps> = ({
   };
 
   const handleAddManualLink = () => {
-    const name = window.prompt('Masukkan nama berkas/dokumen (contoh: Modul Praktikum 1.pdf):');
+    const name = window.prompt('Masukkan nama berkas/dokumen/video (contoh: Modul Praktikum 1.pdf atau Video Demo):');
     if (!name || !name.trim()) return;
 
     const url = window.prompt(
-      'Masukkan URL atau tautan berkas (contoh: https://drive.google.com/... atau URL dokumen):',
+      'Masukkan URL atau tautan berkas/video (contoh: https://youtube.com/watch?v=... atau https://drive.google.com/...):',
       'https://'
     );
     if (!url || !url.trim()) return;
@@ -312,6 +477,14 @@ export const MaterialEditorModal: React.FC<MaterialEditorModalProps> = ({
     else if (['ppt', 'pptx'].includes(ext)) fileType = 'presentation';
     else if (['xls', 'xlsx', 'csv'].includes(ext)) fileType = 'spreadsheet';
     else if (['jpg', 'jpeg', 'png', 'svg'].includes(ext)) fileType = 'image';
+    else if (
+      ['mp4', 'webm'].includes(ext) ||
+      url.includes('youtube.com') ||
+      url.includes('youtu.be') ||
+      url.includes('vimeo.com')
+    ) {
+      fileType = 'video';
+    }
 
     const newAtt: MaterialAttachment = {
       id: 'att_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
@@ -324,21 +497,27 @@ export const MaterialEditorModal: React.FC<MaterialEditorModalProps> = ({
 
     if (fileType === 'image') {
       insertAtCursor(`\n\n![${name.trim()}](${url.trim()})\n\n`);
+    } else if (fileType === 'video') {
+      insertAtCursor(`\n\n🎥 [Video: ${name.trim()}](${url.trim()})\n\n`);
     } else {
-      insertAtCursor(`\n\n📎 [Unduh Dokumen: ${name.trim()}](${url.trim()})\n\n`);
+      insertAtCursor(`\n\n📎 [Dokumen: ${name.trim()}](${url.trim()})\n\n`);
     }
   };
 
   const handleInsertAttachmentToContent = (att: MaterialAttachment) => {
+    // If att.url is a data URL, always insert clean reference `attachment:${att.id}` to prevent cluttering textarea
+    const targetUrl = att.url.startsWith('data:') ? `attachment:${att.id}` : att.url;
     if (att.type === 'image') {
-      insertAtCursor(`\n\n![${att.name}](${att.url})\n\n`);
+      insertAtCursor(`\n\n![${att.name}](${targetUrl})\n\n`);
+    } else if (att.type === 'video') {
+      insertAtCursor(`\n\n🎥 [Video: ${att.name}](${targetUrl})\n\n`);
     } else {
-      insertAtCursor(`\n\n📎 [Unduh Dokumen: ${att.name}](${att.url})\n\n`);
+      insertAtCursor(`\n\n📎 [Dokumen: ${att.name}](${targetUrl})\n\n`);
     }
     showToast({
       type: 'success',
       title: 'Disisipkan ke Naskah',
-      message: `Tautan "${att.name}" telah ditambahkan ke isi materi.`,
+      message: `Tautan "${att.name}" telah ditambahkan ke isi materi secara rapi.`,
     });
   };
 
@@ -623,13 +802,35 @@ export const MaterialEditorModal: React.FC<MaterialEditorModalProps> = ({
 
                 <button
                   type="button"
+                  onClick={() => setShowVideoModal(true)}
+                  className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                  title="Sisipkan video YouTube, Google Drive, Vimeo, atau unggah video yang dapat ditayangkan langsung"
+                >
+                  <Video className="w-3.5 h-3.5" />
+                  <span>Sisipkan Video</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => fileInputRef.current?.click()}
                   className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-                  title="Unggah berkas dokumen (PDF, Word, PPT, Excel) dan sisipkan ke naskah"
+                  title="Unggah berkas dokumen (PDF, Word, PPT, Excel, dll) dan sisipkan ke naskah"
                 >
                   <Paperclip className="w-3.5 h-3.5" />
                   <span>Sisipkan File / Dokumen</span>
                 </button>
+
+                {content.includes('](data:') && (
+                  <button
+                    type="button"
+                    onClick={cleanUpBloatedDataUrls}
+                    className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer animate-pulse"
+                    title="Rapikan deretan teks base64 panjang menjadi referensi nama file rapi"
+                  >
+                    <Wand2 className="w-3.5 h-3.5" />
+                    <span>Rapikan Naskah</span>
+                  </button>
+                )}
 
                 <div className="h-4 w-px bg-slate-300 mx-1 hidden sm:block" />
 
@@ -706,20 +907,40 @@ export const MaterialEditorModal: React.FC<MaterialEditorModalProps> = ({
               </div>
 
               <span className="text-[10px] text-slate-400 hidden xl:inline">
-                Dapat paste gambar langsung (Ctrl+V)
+                Paste gambar langsung (Ctrl+V) &amp; video didukung
               </span>
             </div>
 
             {/* Content Area View: Editor vs Live Preview Sebelum Disimpan */}
             {contentViewMode === 'edit' ? (
-              <div>
+              <div className="space-y-2">
+                {/* Banner Rapikan jika terdapat base64 panjang */}
+                {content.includes('](data:') && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-amber-900 animate-in fade-in">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>
+                        <strong>Teks naskah memuat deretan kode berkas panjang (Base64).</strong> Klik tombol di samping untuk merapikannya sehingga hanya nama dokumen yang tampil.
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={cleanUpBloatedDataUrls}
+                      className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold flex items-center gap-1.5 shadow-2xs transition-colors shrink-0 cursor-pointer self-start sm:self-auto"
+                    >
+                      <Wand2 className="w-3.5 h-3.5" />
+                      <span>Rapikan Teks Sekarang</span>
+                    </button>
+                  </div>
+                )}
+
                 <textarea
                   ref={textareaRef}
                   rows={10}
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   onPaste={handleTextareaPaste}
-                  placeholder="Tuliskan naskah materi pembelajaran di sini... Anda dapat menyisipkan foto diagram menggunakan tombol 'Sisipkan Gambar' di atas, menempelkan screenshot (Ctrl+V), atau menyisipkan file modul PDF."
+                  placeholder="Tuliskan naskah materi pembelajaran di sini... Anda dapat menyisipkan foto diagram, memutar video tayangan langsung, atau menyisipkan berkas dokumen PDF modul kuliah."
                   className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-500 font-mono leading-relaxed"
                   required
                 />
@@ -727,7 +948,7 @@ export const MaterialEditorModal: React.FC<MaterialEditorModalProps> = ({
                   <div className="flex items-center gap-2">
                     <span className="inline-flex items-center gap-1 text-indigo-600 font-semibold">
                       <Sparkles className="w-3 h-3" />
-                      Mendukung format gambar ![Keterangan](url) &amp; file 📎 [Unduh](url)
+                      Mendukung 🎥 Video (YouTube/Drive/Direct), ![Gambar](url), &amp; 📎 Dokumen rapi
                     </span>
                   </div>
                   <span>{content.length} karakter</span>
@@ -740,7 +961,7 @@ export const MaterialEditorModal: React.FC<MaterialEditorModalProps> = ({
                   <div className="flex items-center gap-2">
                     <Eye className="w-4 h-4 text-indigo-600 shrink-0" />
                     <span>
-                      <strong>Mode Pratinjau Langsung (Sebelum Disimpan):</strong> Gambar diagram, dokumen berkas, kotak tips, dan tabel ditampilkan persis seperti yang akan dilihat mahasiswa dan dosen.
+                      <strong>Mode Pratinjau Langsung (Sebelum Disimpan):</strong> Video dapat diputar langsung di sini, gambar diagram, dan dokumen berkas tampil rapi.
                     </span>
                   </div>
                   <button
@@ -753,22 +974,22 @@ export const MaterialEditorModal: React.FC<MaterialEditorModalProps> = ({
                 </div>
 
                 <div className="p-4 sm:p-6 bg-slate-50/50 rounded-2xl border border-slate-200 max-h-[460px] overflow-y-auto">
-                  <RichContentRenderer content={content} />
+                  <RichContentRenderer content={content} attachments={attachments} />
                 </div>
               </div>
             )}
           </div>
 
-          {/* Lampiran Dokumen, File, atau Gambar */}
+          {/* Lampiran Dokumen, File, Video, atau Gambar */}
           <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <label className="block text-xs font-bold text-slate-800 flex items-center gap-1.5">
                   <Paperclip className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>Lampiran Dokumen, Modul PDF, Slide, atau Gambar ({attachments.length})</span>
+                  <span>Lampiran Dokumen, Video, Modul PDF, &amp; Slide ({attachments.length})</span>
                 </label>
                 <p className="text-[11px] text-slate-500 mt-0.5">
-                  Berkas bahan ajar pendukung yang dapat diunduh mahasiswa. Klik &quot;+ Sisipkan ke Naskah&quot; untuk mencantumkannya ke isi bacaan materi.
+                  Berkas bahan ajar pendukung yang dapat diunduh atau diputar mahasiswa. Klik &quot;+ Sisipkan ke Naskah&quot; untuk mencantumkannya ke isi bacaan materi secara rapi.
                 </p>
               </div>
 
@@ -778,7 +999,7 @@ export const MaterialEditorModal: React.FC<MaterialEditorModalProps> = ({
                   ref={fileInputRef}
                   onChange={handleFileUpload}
                   multiple
-                  accept=".pdf,.ppt,.pptx,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.svg,.webp"
+                  accept=".pdf,.ppt,.pptx,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.svg,.webp,.mp4,.webm,.ogg"
                   className="hidden"
                 />
                 <button
@@ -804,7 +1025,9 @@ export const MaterialEditorModal: React.FC<MaterialEditorModalProps> = ({
               <div className="space-y-2 pt-1">
                 {attachments.map((att) => {
                   const isReferencedInContent =
-                    content.includes(att.url) || content.includes(att.name);
+                    content.includes(att.id) ||
+                    content.includes(att.url) ||
+                    content.includes(att.name);
 
                   return (
                     <div
@@ -815,10 +1038,12 @@ export const MaterialEditorModal: React.FC<MaterialEditorModalProps> = ({
                         <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-700 shrink-0">
                           {att.type === 'image' ? (
                             <ImageIcon className="w-4 h-4 text-purple-600" />
+                          ) : att.type === 'video' ? (
+                            <Video className="w-4 h-4 text-rose-600" />
                           ) : att.type === 'spreadsheet' ? (
                             <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
                           ) : (
-                            <FileText className="w-4 h-4 text-rose-600" />
+                            <FileText className="w-4 h-4 text-blue-600" />
                           )}
                         </div>
                         <div className="min-w-0">
@@ -1113,6 +1338,199 @@ export const MaterialEditorModal: React.FC<MaterialEditorModalProps> = ({
           </div>
         </div>
       )}
+
+      {/* ========================================================================= */}
+      {/* MODAL SISIPKAN VIDEO KE DALAM NASKAH */}
+      {/* ========================================================================= */}
+      {showVideoModal && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-rose-50 text-rose-600">
+                  <Video className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-base font-black text-slate-900">Sisipkan Video Pembelajaran</h4>
+                  <p className="text-xs text-slate-500">
+                    Video dapat diputar langsung di halaman naskah materi oleh mahasiswa dan dosen.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowVideoModal(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Source Tab Switcher */}
+            <div className="flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200">
+              <button
+                type="button"
+                onClick={() => setVideoModalTab('url')}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  videoModalTab === 'url'
+                    ? 'bg-white text-rose-700 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Youtube className="w-3.5 h-3.5 text-rose-600" />
+                <span>Tautan Video (YouTube / Drive / Web)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setVideoModalTab('upload')}
+                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                  videoModalTab === 'upload'
+                    ? 'bg-white text-rose-700 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>Unggah Berkas Video</span>
+              </button>
+            </div>
+
+            {/* Tab 1: Video URL (YouTube, Vimeo, Google Drive, Direct MP4) */}
+            {videoModalTab === 'url' && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    URL Video Daring
+                  </label>
+                  <input
+                    type="url"
+                    value={videoUrlInput}
+                    onChange={(e) => setVideoUrlInput(e.target.value)}
+                    placeholder="Contoh: https://www.youtube.com/watch?v=... atau https://youtu.be/..."
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-rose-500 font-mono"
+                  />
+                  <div className="mt-1.5 p-2 bg-slate-50 rounded-lg border border-slate-200/80 text-[11px] text-slate-500 space-y-0.5">
+                    <p className="font-semibold text-slate-700">Platform video yang didukung &amp; diputar langsung:</p>
+                    <ul className="list-disc pl-4 space-y-0.5 text-slate-600">
+                      <li>YouTube &amp; YouTube Shorts (pemutar terintegrasi)</li>
+                      <li>Google Drive Video Preview (link file /preview)</li>
+                      <li>Vimeo Video</li>
+                      <li>Tautan langsung berkas (.mp4, .webm)</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Judul / Keterangan Video
+                  </label>
+                  <input
+                    type="text"
+                    value={videoTitleInput}
+                    onChange={(e) => setVideoTitleInput(e.target.value)}
+                    placeholder="Contoh: Video Penjelasan Materi Konsep Sistem Operasi &amp; GUI"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-rose-500"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Tab 2: Upload Video File */}
+            {videoModalTab === 'upload' && (
+              <div className="space-y-3">
+                <input
+                  type="file"
+                  ref={videoUploadInputRef}
+                  accept="video/mp4,video/webm,video/ogg"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const formatSize = (bytes: number) => {
+                      if (bytes < 1024) return bytes + ' B';
+                      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+                      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+                    };
+                    setVideoUploadedFileName(file.name);
+                    setVideoUploadedSize(formatSize(file.size));
+                    if (!videoTitleInput) {
+                      setVideoTitleInput(file.name.replace(/\.[^/.]+$/, ''));
+                    }
+                    const reader = new FileReader();
+                    reader.onload = (loadEvt) => {
+                      setVideoUploadedDataUrl((loadEvt.target?.result as string) || '');
+                    };
+                    reader.readAsDataURL(file);
+                  }}
+                />
+
+                <div
+                  onClick={() => videoUploadInputRef.current?.click()}
+                  className="p-6 border-2 border-dashed border-rose-200 hover:border-rose-400 bg-rose-50/30 hover:bg-rose-50/60 rounded-2xl flex flex-col items-center justify-center text-center cursor-pointer transition-all"
+                >
+                  {videoUploadedDataUrl ? (
+                    <div className="space-y-2 w-full">
+                      <video
+                        src={videoUploadedDataUrl}
+                        controls
+                        className="max-h-44 w-auto mx-auto rounded-xl shadow-md border border-slate-200"
+                      />
+                      <p className="text-xs font-bold text-rose-700">
+                        {videoUploadedFileName} ({videoUploadedSize})
+                      </p>
+                      <p className="text-[11px] text-slate-500">Klik untuk mengganti berkas video</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="p-3 bg-white rounded-2xl shadow-xs text-rose-600 mb-2">
+                        <Upload className="w-6 h-6" />
+                      </div>
+                      <p className="text-xs font-bold text-slate-800">
+                        Klik untuk memilih video dari komputer Anda
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        Format didukung: MP4, WebM, OGG
+                      </p>
+                    </>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Judul Video
+                  </label>
+                  <input
+                    type="text"
+                    value={videoTitleInput}
+                    onChange={(e) => setVideoTitleInput(e.target.value)}
+                    placeholder="Contoh: Rekaman Demonstrasi Praktikum Mandiri"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-rose-500"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowVideoModal(false)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmInsertVideo}
+                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-md transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <Play className="w-4 h-4 fill-white" />
+                <span>Sisipkan Video ke Naskah</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+
