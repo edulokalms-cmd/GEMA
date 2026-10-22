@@ -52,6 +52,11 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           }
           return prev;
         });
+      } else {
+        setActiveCourseIdState('all');
+        try {
+          localStorage.setItem(ACTIVE_COURSE_KEY, 'all');
+        } catch {}
       }
     } catch (err) {
       console.error('Failed fetching courses:', err);

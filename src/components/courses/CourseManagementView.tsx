@@ -203,15 +203,6 @@ export const CourseManagementView: React.FC<CourseManagementViewProps> = ({ onNa
   };
 
   const handleDelete = async (course: Course) => {
-    if (courses.length <= 1) {
-      showToast({
-        type: 'error',
-        title: 'Tidak Dapat Menghapus',
-        message: 'Sistem harus memiliki setidaknya satu mata kuliah aktif.',
-      });
-      return;
-    }
-
     if (
       !window.confirm(
         `Apakah Anda yakin ingin menghapus mata kuliah "${course.name}" (${course.code})?`
@@ -303,10 +294,33 @@ export const CourseManagementView: React.FC<CourseManagementViewProps> = ({ onNa
       </div>
 
       {/* Courses Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-5">
-        {filteredCourses.map((course) => {
-          const isActive = activeCourseId === course.id;
-          const courseColor = course.color || '#012E26';
+      {filteredCourses.length === 0 ? (
+        <div className="bg-white rounded-3xl border border-slate-200/90 p-12 text-center space-y-4 shadow-xs">
+          <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto text-slate-400">
+            <BookOpen className="w-8 h-8" />
+          </div>
+          <div>
+            <h3 className="text-lg font-black text-slate-900">Belum Ada Mata Kuliah</h3>
+            <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
+              {search
+                ? 'Tidak ada mata kuliah yang cocok dengan kata kunci pencarian Anda.'
+                : 'Belum ada mata kuliah yang terdaftar atau seluruh mata kuliah telah dihapus. Klik tombol di bawah untuk menambahkan mata kuliah baru.'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={openCreateModal}
+            className="px-5 py-2.5 rounded-xl bg-[#012E26] hover:bg-[#023b31] text-white text-xs font-bold transition-all shadow-md shadow-[#012E26]/10 inline-flex items-center gap-2 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Tambah Mata Kuliah Baru</span>
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-5">
+          {filteredCourses.map((course) => {
+            const isActive = activeCourseId === course.id;
+            const courseColor = course.color || '#012E26';
 
           return (
             <div
@@ -554,7 +568,8 @@ export const CourseManagementView: React.FC<CourseManagementViewProps> = ({ onNa
             </div>
           );
         })}
-      </div>
+        </div>
+      )}
 
       {/* Modal Tambah / Edit Mata Kuliah */}
       {showModal && (

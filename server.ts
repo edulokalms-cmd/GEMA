@@ -4468,8 +4468,8 @@ app.get('/api/grades/components', requireAuth, (req: Request, res: Response) => 
 app.put('/api/grades/components', requireAuth, requireRole('admin', 'dosen'), (req: Request, res: Response) => {
   const currentUser = (req as any).user;
   const { components } = req.body;
-  if (!Array.isArray(components) || components.length === 0) {
-    return res.status(400).json({ error: 'Daftar komponen penilaian tidak boleh kosong.' });
+  if (!Array.isArray(components)) {
+    return res.status(400).json({ error: 'Daftar komponen penilaian tidak valid.' });
   }
 
   const sanitized: GradeComponentConfig[] = components.map((c: any, index: number) => ({
@@ -5161,11 +5161,10 @@ app.delete('/api/courses/:id', requireAuth, requireRole('admin', 'dosen'), (req:
     }
   }
 
-  if (db.courses.length <= 1) {
-    return res.status(400).json({ error: 'Minimal harus ada 1 mata kuliah aktif di sistem.' });
-  }
-
   db.courses = db.courses.filter(c => c.id !== req.params.id);
+  if (db.settings && db.settings.active_course_id === req.params.id) {
+    db.settings.active_course_id = db.courses[0]?.id || '';
+  }
   saveDatabase(db);
   addActivity(currentUser.id, currentUser.name, currentUser.role, 'COURSE_DELETED', `Menghapus mata kuliah: ${course.name}`);
 
@@ -5641,10 +5640,6 @@ app.delete('/api/departments/:id', requireAuth, requireRole('admin'), (req: Requ
     return res.status(404).json({ error: 'Program studi tidak ditemukan.' });
   }
 
-  if (db.departments.length <= 1) {
-    return res.status(400).json({ error: 'Minimal harus ada 1 program studi aktif di sistem.' });
-  }
-
   db.departments = db.departments.filter(d => d.id !== req.params.id);
   saveDatabase(db);
   addActivity((req as any).user.id, (req as any).user.name, 'admin', 'DEPARTMENT_DELETED', `Menghapus Program Studi: ${dept.name}`);
@@ -5781,10 +5776,6 @@ app.delete('/api/classes/:id', requireAuth, requireRole('admin'), (req: Request,
   const cls = db.classes.find(c => c.id === req.params.id);
   if (!cls) {
     return res.status(404).json({ error: 'Kelas tidak ditemukan.' });
-  }
-
-  if (db.classes.length <= 1) {
-    return res.status(400).json({ error: 'Minimal harus ada 1 kelas aktif di sistem.' });
   }
 
   const deletedClassName = cls.name;

@@ -195,15 +195,6 @@ export const ClassManagementView: React.FC<ClassManagementViewProps> = ({ onNavi
   };
 
   const handleDelete = async (cls: AcademicClass) => {
-    if (classes.length <= 1) {
-      showToast({
-        type: 'info',
-        title: 'Tidak Bisa Dihapus',
-        message: 'Minimal harus ada 1 kelas aktif di sistem.',
-      });
-      return;
-    }
-
     if (!window.confirm(`Yakin ingin menghapus kelas "${cls.name}"? Kelas ini akan dihapus dari sistem dan otomatis dicabut dari seluruh daftar mata kuliah yang terhubung.`)) {
       return;
     }

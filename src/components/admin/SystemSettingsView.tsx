@@ -439,15 +439,6 @@ export const SystemSettingsView: React.FC<SystemSettingsViewProps> = ({ onNaviga
   };
 
   const handleDeleteComp = async (index: number) => {
-    if (components.length <= 1) {
-      showToast({
-        type: 'info',
-        title: 'Tidak Bisa Dihapus',
-        message: 'Minimal harus ada 1 komponen penilaian yang aktif.',
-      });
-      return;
-    }
-
     const target = components[index];
     if (!window.confirm(`Yakin ingin menghapus komponen penilaian "${target.name}"?`)) {
       return;

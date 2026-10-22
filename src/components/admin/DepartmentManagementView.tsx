@@ -324,15 +324,6 @@ export const DepartmentManagementView: React.FC<DepartmentManagementViewProps> =
   };
 
   const handleDelete = async (dept: Department) => {
-    if (departments.length <= 1) {
-      showToast({
-        type: 'info',
-        title: 'Tidak Bisa Dihapus',
-        message: 'Minimal harus ada 1 program studi aktif di sistem.',
-      });
-      return;
-    }
-
     if (!window.confirm(`Yakin ingin menghapus Program Studi "${dept.name}" (${dept.code})? Data kelas dan mahasiswa yang terkait akan tetap tersimpan.`)) {
       return;
     }
